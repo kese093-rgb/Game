@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>Бой</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+}
+
+#game {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+/* АРЕНА */
+
+#arena {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ЗДОРОВЬЕ */
+
+#healthUI {
+    position: absolute;
+    top: 12px;
+    left: 3%;
+    right: 3%;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    z-index: 10;
+}
+
+.healthBox {
+    width: 42%;
+}
+
+.name {
+    color: white;
+    font: bold 15px Arial;
+    margin-bottom: 4px;
+    text-shadow: 2px 2px 3px #000;
+}
+
+.bar {
+    width: 100%;
+    height: 17px;
+    border: 2px solid white;
+    background: #222;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.hp {
+    width: 100%;
+    height: 100%;
+    background: #22d33f;
+    transition: width .15s;
+}
+
+/* БОЙЦЫ */
+
+.fighter {
+    position: absolute;
+
+    /* Боец стоит выше кнопок и на поверхности ринга */
+    bottom: 31%;
+
+    width: 105px;
+    height: 155px;
+
+    z-index: 5;
+}
+
+.fighter img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* НЕГР — ИГРОК, СЛЕВА */
+
+#player {
+    left: 18%;
+}
+
+/* СВЕТЛЫЙ — БОТ, СПРАВА */
+
+#enemy {
+    left: 67%;
+}
+
+/* КНОПКИ */
+
+#controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: max(12px, env(safe-area-inset-bottom));
+
+    height: 75px;
+
+    padding: 0 18px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    z-index: 20;
+}
+
+.controlGroup {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    width: 62px;
+    height: 62px;
+
+    border-radius: 15px;
+    border: 2px solid rgba(255,255,255,.5);
+
+    background: rgba(0,0,0,.7);
+    color: white;
+
+    font-size: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button:active {
+    transform: scale(.9);
+    background: rgba(255,255,255,.25);
+}
+
+/* РЕЗУЛЬТАТ */
+
+#result {
+    position: absolute;
+    inset: 0;
+
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0,0,0,.7);
+
+    color: white;
+
+    z-index: 50;
+}
+
+#result h1 {
+    font: bold 42px Arial;
+    margin-bottom: 20px;
+}
+
+#restart {
+    width: 180px;
+    height: 55px;
+    font-size: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+<img id="arena"
+src="file_00000000558881f4a120c96c574dc0e7.png">
+
+<!-- ЗДОРОВЬЕ -->
+
+<div id="healthUI">
+
+    <div class="healthBox">
+        <div class="name">ИГРОК</div>
+        <div class="bar">
+            <div id="playerHP" class="hp"></div>
+        </div>
+    </div>
+
+    <div class="healthBox">
+        <div class="name" style="text-align:right">БОТ</div>
+        <div class="bar">
+            <div id="enemyHP" class="hp"></div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ИГРОК — НЕГР -->
+
+<div id="player" class="fighter">
+    <img
+    id="playerImg"
+    src="file_00000000464081f4b6b2f512e35f627f.png">
+</div>
+
+
+<!-- БОТ — СВЕТЛЫЙ -->
+
+<div id="enemy" class="fighter">
+    <img
+    id="enemyImg"
+    src="file_00000000af9081f4bb30375a6f7dff03.png">
+</div>
+
+
+<!-- УПРАВЛЕНИЕ -->
+
+<div id="controls">
+
+    <div class="controlGroup">
+        <button id="left">◀️</button>
+        <button id="right">▶️</button>
+    </div>
+
+    <div class="controlGroup">
+        <button id="attack">🥊</button>
+        <button id="block">🛡️</button>
+    </div>
+
+</div>
+
+
+<!-- ПОБЕДА -->
+
+<div id="result">
+
+    <h1 id="resultText">ПОБЕДА!</h1>
+
+    <button id="restart">Ещё раз</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+const PLAYER_IDLE =
+"file_00000000464081f4b6b2f512e35f627f.png";
+
+const PLAYER_ATTACK =
+"file_00000000e1888210802cd810fbcfc02a.png";
+
+const ENEMY_IDLE =
+"file_00000000af9081f4bb30375a6f7dff03.png";
+
+const ENEMY_ATTACK =
+"file_00000000eacc8210a6fbcecb836fbcf4.png";
+
+
+let playerHP = 100;
+let enemyHP = 100;
+
+let playerX = 18;
+let enemyX = 67;
+
+let attacking = false;
+let enemyAttacking = false;
+
+let lastAttack = 0;
+let lastEnemyAttack = 0;
+
+let gameOver = false;
+
+let keys = {
+    left: false,
+    right: false
+};
+
+
+const player =
+document.getElementById("player");
+
+const enemy =
+document.getElementById("enemy");
+
+const playerImg =
+document.getElementById("playerImg");
+
+const enemyImg =
+document.getElementById("enemyImg");
+
+const playerHPBar =
+document.getElementById("playerHP");
+
+const enemyHPBar =
+document.getElementById("enemyHP");
+
+const result =
+document.getElementById("result");
+
+const resultText =
+document.getElementById("resultText");
+
+
+function updatePositions() {
+
+    player.style.left = playerX + "%";
+    enemy.style.left = enemyX + "%";
+}
+
+
+function distance() {
+    return Math.abs(enemyX - playerX);
+}
+
+
+/* ДВИЖЕНИЕ ИГРОКА */
+
+function movePlayer() {
+
+    if (gameOver) return;
+
+    const speed = .28;
+
+    if (keys.left)
+        playerX -= speed;
+
+    if (keys.right)
+        playerX += speed;
+
+    /*
+    Игрок не может выйти
+    за пределы своей части арены.
+    */
+
+    playerX =
+    Math.max(5, Math.min(78, playerX));
+
+    updatePositions();
+}
+
+
+/* УДАР */
+
+function playerAttack() {
+
+    if (gameOver) return;
+
+    const now = Date.now();
+
+    /*
+    Не чаще одного раза в секунду.
+    */
+
+    if (now - lastAttack < 1000)
+        return;
+
+    if (attacking)
+        return;
+
+    lastAttack = now;
+
+    attacking = true;
+
+    playerImg.src = PLAYER_ATTACK;
+
+
+    /*
+    Через 0.25 секунды
+    проверяем попадание.
+    */
+
+    setTimeout(() => {
+
+        if (gameOver) return;
+
+        /*
+        Дальность удара.
+        */
+
+        if (distance() <= 12) {
+
+            enemyHP -= 10;
+
+            enemyHP =
+            Math.max(0, enemyHP);
+
+            enemyHPBar.style.width =
+            enemyHP + "%";
+
+            if (enemyHP <= 0)
+                endGame(true);
+        }
+
+    }, 250);
+
+
+    /*
+    Анимация длится 0.5 секунды.
+    */
+
+    setTimeout(() => {
+
+        attacking = false;
+
+        if (!gameOver)
+            playerImg.src = PLAYER_IDLE;
+
+    }, 500);
+}
+
+
+/* ИИ */
+
+function botAI() {
+
+    if (gameOver || enemyAttacking)
+        return;
+
+    const d = distance();
+
+
+    /*
+    Слишком далеко —
+    идёт к игроку.
+    */
+
+    if (d > 15) {
+
+        enemyX -= .13;
+    }
+
+
+    /*
+    Слишком близко —
+    иногда отходит.
+    */
+
+    else if (d < 7) {
+
+        if (Math.random() < .035)
+            enemyX += .25;
+    }
+
+
+    /*
+    Небольшие движения,
+    похожие на человека.
+    */
+
+    else {
+
+        if (Math.random() < .025)
+            enemyX -= .16;
+
+        if (Math.random() < .02)
+            enemyX += .16;
+    }
+
+
+    /*
+    Атака.
+    */
+
+    if (d <= 12) {
+
+        if (Math.random() < .035)
+            enemyAttack();
+    }
+
+
+    enemyX =
+    Math.max(20, Math.min(83, enemyX));
+
+    updatePositions();
+}
+
+
+/* УДАР БОТА */
+
+function enemyAttack() {
+
+    if (gameOver)
+        return;
+
+    const now = Date.now();
+
+    if (now - lastEnemyAttack < 1000)
+        return;
+
+    if (enemyAttacking)
+        return;
+
+    lastEnemyAttack = now;
+
+    enemyAttacking = true;
+
+    enemyImg.src = ENEMY_ATTACK;
+
+
+    setTimeout(() => {
+
+        if (gameOver) return;
+
+        if (distance() <= 12) {
+
+            playerHP -= 10;
+
+            playerHP =
+            Math.max(0, playerHP);
+
+            playerHPBar.style.width =
+            playerHP + "%";
+
+            if (playerHP <= 0)
+                endGame(false);
+        }
+
+    }, 250);
+
+
+    setTimeout(() => {
+
+        enemyAttacking = false;
+
+        if (!gameOver)
+            enemyImg.src = ENEMY_IDLE;
+
+    }, 500);
+}
+
+
+/* КОНЕЦ БОЯ */
+
+function endGame(playerWon) {
+
+    gameOver = true;
+
+    resultText.textContent =
+    playerWon ? "ПОБЕДА!" : "ПОРАЖЕНИЕ";
+
+    result.style.display = "flex";
+}
+
+
+/* ПЕРЕЗАПУСК */
+
+document.getElementById("restart")
+.addEventListener("click", () => {
+
+    playerHP = 100;
+    enemyHP = 100;
+
+    playerX = 18;
+    enemyX = 67;
+
+    attacking = false;
+    enemyAttacking = false;
+
+    lastAttack = 0;
+    lastEnemyAttack = 0;
+
+    gameOver = false;
+
+    playerImg.src = PLAYER_IDLE;
+    enemyImg.src = ENEMY_IDLE;
+
+    playerHPBar.style.width = "100%";
+    enemyHPBar.style.width = "100%";
+
+    result.style.display = "none";
+
+    updatePositions();
+});
+
+
+/* КНОПКИ ДВИЖЕНИЯ */
+
+function hold(button, direction) {
+
+    button.addEventListener("pointerdown", e => {
+
+        e.preventDefault();
+
+        keys[direction] = true;
+    });
+
+    button.addEventListener("pointerup", e => {
+
+        e.preventDefault();
+
+        keys[direction] = false;
+    });
+
+    button.addEventListener("pointercancel", () => {
+        keys[direction] = false;
+    });
+
+    button.addEventListener("pointerleave", () => {
+        keys[direction] = false;
+    });
+}
+
+
+hold(
+    document.getElementById("left"),
+    "left"
+);
+
+hold(
+    document.getElementById("right"),
+    "right"
+);
+
+
+/* АТАКА */
+
+document.getElementById("attack")
+.addEventListener("pointerdown", e => {
+
+    e.preventDefault();
+
+    playerAttack();
+});
+
+
+/* БЛОК ПОКА НЕ РАБОТАЕТ */
+
+document.getElementById("block")
+.addEventListener("pointerdown", e => {
+
+    e.preventDefault();
+
+});
+
+
+/* КЛАВИАТУРА */
+
+document.addEventListener("keydown", e => {
+
+    if (e.key === "ArrowLeft" || e.key === "a")
+        keys.left = true;
+
+    if (e.key === "ArrowRight" || e.key === "d")
+        keys.right = true;
+
+    if (e.key === " ")
+        playerAttack();
+});
+
+
+document.addEventListener("keyup", e => {
+
+    if (e.key === "ArrowLeft" || e.key === "a")
+        keys.left = false;
+
+    if (e.key === "ArrowRight" || e.key === "d")
+        keys.right = false;
+});
+
+
+/* ИГРОВОЙ ЦИКЛ */
+
+function loop() {
+
+    movePlayer();
+
+    botAI();
+
+    requestAnimationFrame(loop);
+}
+
+
+updatePositions();
+
+loop();
+
+</script>
+
+</body>
+  </html>
